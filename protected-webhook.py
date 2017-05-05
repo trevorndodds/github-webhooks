@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import json
 import os
 import urllib2
@@ -22,12 +23,15 @@ def webhook():
     if event == 'create':
         print "we have received a %s event from GHE" % event
         payload = json.loads(request.data)
-        if 'protected' in payload['ref']:
-            print "Protected Branch - %s - %s" % (payload['repository']['full_name'], payload['ref'])
-            response = invoke_protected(payload)
-            return response
+        if payload['ref_type'] == 'branch':
+            if 'protected' in payload['ref'].lower():
+                print "Protected Branch - %s - %s" % (payload['repository']['full_name'], payload['ref'])
+                response = invoke_protected(payload)
+                return response
+            else:
+                return "Not a protected branch"
         else:
-            return "Not a protected branch"
+            return "Not a branch but a %s" % payload['ref_type']
     else:
         return "Wrong Event Type"
 
@@ -37,6 +41,7 @@ def invoke_protected(data):
     repo_full = data['repository']['full_name']
     protected = '{"protection": {"enabled": true}}'
     url = "http://"+githubserver+"/api/v3/repos/"+repo_full+"/branches/"+branch
+
     try:
         print "Calling GitHub API to set %s to protected" % branch
         req = urllib2.Request(url, data=protected)
