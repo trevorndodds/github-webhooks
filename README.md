@@ -21,6 +21,7 @@ Description=GitHub Potected-Webhook
 After=multi-user.target
 
 [Service]
+Environment=PYTHONUNBUFFERED=true
 Type=simple
 ExecStart=/data/scripts/webhooks/protected-webhook.py
 User=root
