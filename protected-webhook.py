@@ -32,6 +32,8 @@ def webhook():
                 return "Not a protected branch"
         else:
             return "Not a branch but a %s" % payload['ref_type']
+    elif event == 'ping':
+        return "Pong"
     else:
         return "Wrong Event Type"
 
@@ -40,7 +42,8 @@ def invoke_protected(data):
     branch = data['ref']
     repo_full = data['repository']['full_name']
     protected = '{"protection": {"enabled": true}}'
-    url = "http://"+githubserver+"/api/v3/repos/"+repo_full+"/branches/"+branch
+    req_pull_req = '{"include_admins": true}'
+    url = githubserver+"/api/v3/repos/"+repo_full+"/branches/"+branch
 
     try:
         print "Calling GitHub API to set %s to protected" % branch
@@ -49,10 +52,25 @@ def invoke_protected(data):
         req.add_header('Accept', 'application/vnd.github.loki-preview+json')
         req.get_method = lambda: 'PATCH'
         f = urllib2.urlopen(req)
-        return f.info()['status']
+        if f.info()['status'] == '200 OK':
+            try:
+                print "Calling GitHub API to set %s to require pull requests" % branch
+                url = githubserver + "/api/v3/repos/" + repo_full + "/branches/" + branch \
+                    + "/protection/required_pull_request_reviews"
+                req_pull = urllib2.Request(url, data=req_pull_req)
+                req_pull.add_header('Authorization', 'token %s' % api_token)
+                req_pull.add_header('Accept', 'application/vnd.github.loki-preview+json')
+                req_pull.get_method = lambda: 'PATCH'
+                r = urllib2.urlopen(req_pull)
+                return 'Protected: %s - Pull Requests: %s' % (f.info()['status'], r.info()['status'])
+            except urllib2.HTTPError, e:
+                print 'We failed with error code - %s.' % e.code
+                return 'We failed with error code - %s.' % e.code
+        else:
+            return 'Something went wrong - %s' % f.info()['status']
     except urllib2.HTTPError, e:
         print 'We failed with error code - %s.' % e.code
         return 'We failed with error code - %s.' % e.code
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=port) 
+    app.run(host='0.0.0.0', port=port)
